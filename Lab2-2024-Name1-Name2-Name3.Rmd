@@ -99,12 +99,59 @@ codewords <- (messages %*% G) %% 2
 
 #### Generate random errors; do not forget that they occur with probability $p$! Next, generate the received messages
 
+##### 1
 ```{r}
 #  errors <- ...
+# errors <- t(replicate(100, sample(c(0,1), prob = c(1-p,p), size = 7, replace = T)));
+# errors <- matrix(sample(c(0,1), prob = c(1-p,p), size = 7*100, replace = T), nrow = 100)
+# errors
+
+errors_count <- rpois(7, p)  # number of corruptions per bit
+errors <- errors_count %% 2        # 1 if odd (flipped), 0 if even
+data.frame(errors_count, errors)
+
+errors <- t(replicate(100, rpois(7, p) %% 2))
+
 #  received <-
+received <- xor(codewords, errors) * 1 # * 1 -- to convert TRUE and FALSE to 1 and 0
+
 ```
 
 The next steps include detecting the errors in the received messages, correcting them, and then decoding the obtained messages. After this, you can continue with calculating all the quantities of interest
+
+``` {r}
+z <- received %*% H %% 2
+
+# function to map syndrome (z1,z2,z3) to position 0..7
+syndrome_to_pos <- function(zvec) {
+  # zvec is length-3 vector (z1,z2,z3), bit order matches definition:
+  # position = z1 + 2*z2 + 4*z3
+  pos <- zvec[1] + 2*zvec[2] + 4*zvec[3]
+  return(pos)   # 0 means "no single-bit error detected"
+}
+corrected <- received  # start with received, then flip where needed
+for(i in 1:100) {
+  pos <- syndrome_to_pos(as.integer(z[i, ]))
+  if(pos >= 1 && pos <= 7) {
+    corrected[i, pos] <- (corrected[i, pos] + 1) %% 2
+  }
+}
+
+# now decode: m* = (r3 r5 r6 r7) as given
+decoded <- cbind(corrected[,3], corrected[,5], corrected[,6], corrected[,7])
+
+# success indicator: compare decoded message to original messages
+success <- apply(decoded == messages, 1, all)   # TRUE if all 4 bits recovered
+success_num <- as.integer(success)
+
+# estimate p* and standard error & 95% CI using CLT
+p_hat <- mean(success_num)
+```
+
+$\hat p$ approaches $p*$ because our distribution $X$ consists of samples $X_i$ which are i.i.d. r.v. with Bernouli distribution
+Therefore due to the Strong law of large numbers our ecdf converges almost everywhere to the mean of $X_i \sim \mathscr{B}(1, p^*)$.
+$\hat p = \hat F_{n} \xrightarrow{} E(X_1) = p^*$
+
 
 **Do not forget to include several sentences summarizing your work and the conclusions you have made!**
 
