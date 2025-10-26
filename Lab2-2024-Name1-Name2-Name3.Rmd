@@ -89,11 +89,11 @@ H <- t(matrix(c(1, 0, 1, 0, 1, 0, 1,
 
 ```{r}
 # generate N messages
-
+n <- 100
 message_generator <- function(N) {
   matrix(sample(c(0,1), 4*N, replace = TRUE), nrow = N)
 }
-messages <- message_generator(100)
+messages <- message_generator(n)
 codewords <- (messages %*% G) %% 2
 ```
 
@@ -102,15 +102,16 @@ codewords <- (messages %*% G) %% 2
 ##### 1
 ```{r}
 #  errors <- ...
-# errors <- t(replicate(100, sample(c(0,1), prob = c(1-p,p), size = 7, replace = T)));
-# errors <- matrix(sample(c(0,1), prob = c(1-p,p), size = 7*100, replace = T), nrow = 100)
+# errors <- t(replicate(n, sample(c(0,1), prob = c(1-p,p), size = 7, replace = T)));
+# errors <- matrix(sample(c(0,1), prob = c(1-p,p), size = 7*n, replace = T), nrow = n)
 # errors
 
-errors_count <- rpois(7, p)  # number of corruptions per bit
-errors <- errors_count %% 2        # 1 if odd (flipped), 0 if even
-data.frame(errors_count, errors)
+# errors_count <- rpois(7, p)  # number of corruptions per bit
+# errors <- errors_count %% 2        # 1 if odd (flipped), 0 if even
+# data.frame(errors_count, errors)
 
-errors <- t(replicate(100, rpois(7, p) %% 2))
+# errors <- t(replicate(n, rpois(7, p) %% 2))
+errors <- t(replicate(n, rbinom(7, 1, p)))
 
 #  received <-
 received <- xor(codewords, errors) * 1 # * 1 -- to convert TRUE and FALSE to 1 and 0
@@ -130,7 +131,7 @@ syndrome_to_pos <- function(zvec) {
   return(pos)   # 0 means "no single-bit error detected"
 }
 corrected <- received  # start with received, then flip where needed
-for(i in 1:100) {
+for(i in 1:n) {
   pos <- syndrome_to_pos(as.integer(z[i, ]))
   if(pos >= 1 && pos <= 7) {
     corrected[i, pos] <- (corrected[i, pos] + 1) %% 2
@@ -146,11 +147,58 @@ success_num <- as.integer(success)
 
 # estimate p* and standard error & 95% CI using CLT
 p_hat <- mean(success_num)
+
+p_hat
 ```
 
-$\hat p$ approaches $p*$ because our distribution $X$ consists of samples $X_i$ which are i.i.d. r.v. with Bernouli distribution
+$\hat p$ approaches $p*$ because our distribution $X$ consists of samples $X_i$ which are i.i.d. r.v. with Bernouli distribution.
 Therefore due to the Strong law of large numbers our ecdf converges almost everywhere to the mean of $X_i \sim \mathscr{B}(1, p^*)$.
 $\hat p = \hat F_{n} \xrightarrow{} E(X_1) = p^*$
+
+##### 2
+$Var(\Theta) = \frac{\sum_{i=1}^N Var(X_i)}{N^2} = \frac{p^*(1-p^*)}{N}$
+
+$MSE(\hat{p}) = BIAS(\hat{p})^2 + Var(\hat{p}) \xrightarrow{\hat{p}\ is\ unbiased} MSE(\hat{p}) = Var(\hat{p})$
+
+Due to CLT we can use k-sigma rule to predict the interval $(p^* - 2*sd, p^* + 2*sd)$ in which $\hat{p}$ falls with probability 0.95
+``` {r}
+sd <- sqrt(p_hat*(1 - p_hat) / n)
+sd
+mse <- sd^2
+
+c(p_hat - 2*sd, p_hat + 2*sd)
+```
+
+##### 3
+$\varepsilon = z_{0.975} * \hat{\sigma} = z_{0.975} * \sqrt{\frac{\hat{p}(1-\hat{p})}{N}}$
+
+$N = \frac{\hat{p}(1-\hat{p}) z_{0.975}^2}{\varepsilon^2}$
+
+``` {r}
+epsilon <- 0.03
+N_approx <- p_hat * (1-p_hat) * 1.96^2 / epsilon^2
+N_approx
+```
+
+##### 4
+``` {r}
+# simulate n independent 4-bit messages and count errors per message
+errors_per_msg <- replicate(n, sum(rbinom(4, size = 1, prob = p)))
+# frequency table for k=0..4
+tab <- table(factor(errors_per_msg, levels = 0:4))
+tab
+
+# plot histogram (barplot of frequencies) and overlay expected probabilities scaled by n
+barplot(tab, names.arg = 0:4, xlab = "k = number of bit-errors (out of 4)",
+        ylab = "frequency", main = paste("Histogram of errors per 4-bit message (n=", n, ")", sep=""))
+expected_probs <- dbinom(0:4, size = 4, prob = p)
+expected_counts <- expected_probs * n
+points(0:4 + 0.7, expected_counts, pch = 19)   # plot expected counts as points
+lines(x = 0:4 + 0.7, y = expected_counts)       # connect them
+legend("topright", legend = c("simulated freq", "expected count"),
+       pch = c(15,19), col = c("black","black"))
+
+```
 
 
 **Do not forget to include several sentences summarizing your work and the conclusions you have made!**
