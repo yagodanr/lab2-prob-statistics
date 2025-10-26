@@ -1,6 +1,6 @@
 ---
-title: 'P&S-2022: Lab assignment 2'
-author: "Name1, Name2, Name3"
+title: 'P&S-2025: Lab assignment 2'
+author: "Микита Ягода, Назар Михайлищук, Ірина Свириденко"
 output:
   html_document:
     df_print: paged
@@ -8,8 +8,8 @@ output:
 
 ## General comments and instructions
 
--   Complete solution will give you **4 points** (working code with explanations + oral defense). Submission deadline **November 1, 2023, 22:00**\
--   The report must be prepared as an *R notebook*; you must submit to **cms** both the source *R notebook* **and** the generated html file\
+-   Complete solution will give you **4 points** (working code with explanations + oral defense). Submission deadline **October 30, 2025, 23:59**\
+-   The report must be prepared as an *R notebook*; you must submit to **lms** both the source *R notebook* **and** the generated html file\
 -   At the beginning of the notebook, provide a work-breakdown structure estimating efforts of each team member\
 -   For each task, include
     -   problem formulation and discussion (what is a reasonable answer to discuss);\
@@ -65,7 +65,7 @@ $$
 ```{r}
 # your team id number
                           ###
-id <- 50                  ### Change to the correct id!
+id <- 32                  ### Change to the correct id!
                           ###
 set.seed(id)
 p <- id/100
