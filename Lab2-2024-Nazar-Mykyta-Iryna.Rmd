@@ -63,20 +63,21 @@ $$
 #### First, we set the **id** of the team and define the probability $p$ and the generator and parity-check matrices $G$ and $H$
 
 ```{r}
-# your team id number
-                          ###
-id <- 32                  ### Change to the correct id!
-                          ###
+
+id <- 32
+
 set.seed(id)
 p <- id/100
 # matrices G and H
 G <- matrix(c(1, 1, 1, 0, 0, 0, 0,
-		1, 0, 0, 1, 1, 0, 0,
-		0, 1, 0, 1, 0, 1, 0,
-		1, 1, 0, 1, 0, 0, 1), nrow = 4, byrow = TRUE)
+		      1, 0, 0, 1, 1, 0, 0,
+		      0, 1, 0, 1, 0, 1, 0,
+		      1, 1, 0, 1, 0, 0, 1),
+            nrow = 4, byrow = TRUE)
 H <- t(matrix(c(1, 0, 1, 0, 1, 0, 1,
-		0, 1, 1, 0, 0, 1, 1,
-		0, 0, 0, 1, 1, 1, 1), nrow = 3, byrow = TRUE))
+		        0, 1, 1, 0, 0, 1, 1,
+		        0, 0, 0, 1, 1, 1, 1),
+            nrow = 3, byrow = TRUE))
 # cat("The matrix G is: \n")
 #G
 #cat("The matrix H is: \n")
@@ -327,17 +328,36 @@ curve(pnorm(x, mean = mu, sd = sigma), col = "red", lwd = 2, add = TRUE)
     2.  Let $X \sim \mathscr{N}(\mu,\sigma^2)$ with $\mu = teamidnumber$ and $\sigma^{2} = 2\times teamidnumber+7$. Simulate realizations $x_1,x_2,\dots,x_{100}$ of $X$ and $y_1,y_2,\dots,y_{100}$ of $Y := \frac{1}{X}$ to calculate the values of $\frac{1}{\overline{\textbf{X}}}$ and $\overline{\textbf{Y}}$. Comment on the received results;
 
         ```{r}
-        mu <- 0 #change this!
-        sigma <- 1 #change this
+        mu <- id
+        sigma <- 2*id + 7
         N <- 100
 
-        # YOUR CODE HERE
+        x <- rnorm(N, mean = mu, sd = sqrt(sigma))
+        y <- 1/x
+
+        x_bar <- mean(x)
+        y_bar <- mean(y)
+
+        x_bar
+        y_bar
         ```
 
     3.  Let $X$ and $Y$ be exponentially distributed r.v.'s with parameter $\lambda = 2$. Set $Z := \log{X} + 5$. Plot the Quantile-Quantile plot and scatterplot of $X$ and $Y$. Plot the Quantile-Quantile plot and scatterplot of $X$ and $Z$. Explain the results. Comment on the difference of relations between the pairs of random variables. Which pair of r.v.'s is dependent and which one is similar?
 
         ```{r}
-        # YOUR CODE HERE
+        lambda <- 2
+        z = function(x) { log(x) + 5 }
+        N <- 1000
+        x <- rexp(N, rate = lambda)
+        y <- rexp(N, rate = lambda)
+        z_values <- z(x)
+        par(mfrow=c(2,2))
+        qqplot(x, y, main = "QQ plot of X and Y")
+        plot(x, y, main = "Scatterplot of X and Y", xlab =
+                "X", ylab = "Y")
+        qqplot(x, z_values, main = "QQ plot of X and Z")
+        plot(x, z_values, main = "Scatterplot of X and Z", xlab
+                = "X", ylab = "Z")
         ```
 
     ------------------------------------------------------------------------
@@ -359,13 +379,28 @@ curve(pnorm(x, mean = mu, sd = sigma), col = "red", lwd = 2, add = TRUE)
     2.  What are the expected value and variance of X? Simulate realizations $x_1,x_2,\dots,x_{100}$ of $X$ to calculate the values of sample mean $\overline{\mathbf{X}}$ and sample variance $s^2 = \frac{\sum_{i=1}^{n}{(x_i - \overline{x})^{2}}}{n-1}$. Comment on the results;
 
         ```{r}
-        # YOUR CODE HERE
+        n_sim <- 100 # Renamed from 'n' to avoid conflict with n=3 trials
+        x_sim <- rbinom(n_sim, size = 3, prob = 0.5)
+        x_bar <- mean(x_sim)
+        s2 <- var(x_sim)
+
+        cat("Theoretical E[X]:", 1.5, "\n")
+        cat("Simulation (x_bar):", x_bar, "\n")
+        cat("Theoretical Var(X):", 0.75, "\n")
+        cat("Simulation (s2):", s2, "\n")
         ```
 
     3.  What are the expected value and variance of Y? Simulate realizations $y_1,y_2,\dots,y_{100}$ of $Y$ to calculate the values of sample mean $\overline{\mathbf{Y}}$ and sample variance $s^2 = \frac{\sum_{i=1}^{n}{(y_i - \overline{y})^{2}}}{n-1}$. Comment on the results;
 
         ```{r}
-        # YOUR CODE HERE
+        y_sim <- 0.5 * x_sim - 1
+        y_bar <- mean(y_sim)
+        s2_y <- var(y_sim)
+
+        cat("Theoretical E[Y]:", -0.25, "\n")
+        cat("Simulation (y_bar):", y_bar, "\n")
+        cat("Theoretical Var(Y):", 0.1875, "\n")
+        cat("Simulation (s2_y):", s2_y, "\n")
         ```
 
 **Do not forget to include several sentences summarizing your work and the conclusions you have made!**
