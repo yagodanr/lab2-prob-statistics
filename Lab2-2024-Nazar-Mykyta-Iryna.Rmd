@@ -285,30 +285,192 @@ curve(pnorm(x, mean = mu, sd = sigma), col = "red", lwd = 2, add = TRUE)
 #### First, generate samples an sample means:
 
 ```{r}
-nu1 <- 1  # change this!
-K <- 1e3
-n <- 5
-sample_means <- colMeans(matrix(rexp(n*K, rate = nu1), nrow=n))
+team_id <- 32
+nu1 <- team_id + 10
+
+library(ggplot2)
+library(stats)
+
+K <- 5000
+true_mean <- 1 / nu1
+true_var  <- 1 / (nu1^2)
+
+simulate_clt <- function(n, K = 5000, dist = rexp, dist_params = list(rate = nu1)) {
+  s <- numeric(K)
+  for (i in seq_len(K)) {
+    x <- do.call(dist, c(list(n = n), dist_params))
+    s[i] <- mean(x)
+  }
+  list(n = n, s = s)
+}
+
+set.seed(123)
+results_n5  <- simulate_clt(5,  K = K)
+results_n10 <- simulate_clt(10, K = K)
+results_n50 <- simulate_clt(50, K = K)
 ```
 
 #### Next, calculate the parameters of the standard normal approximation
 
 ```{r}
-mu <- 0       # change this!
-sigma <- 1    # change this!
+calculate_clt_params <- function(res, true_mean, true_var) {
+  xs <- sort(res$s)
+  ecdf_s <- ecdf(res$s)
+  mu_clt <- true_mean
+  sigma_clt <- sqrt(true_var / res$n)
+
+  normal_cdf_vals <- pnorm(xs, mean = mu_clt, sd = sigma_clt)
+  ecdf_vals <- ecdf_s(xs)
+  D <- max(abs(ecdf_vals - normal_cdf_vals))
+
+  c(res, list(xs = xs, ecdf_vals = ecdf_vals,
+              normal_cdf_vals = normal_cdf_vals, D = D,
+              mu_clt = mu_clt, sigma_clt = sigma_clt))
+}
+
+results_n5  <- calculate_clt_params(results_n5,  true_mean, true_var)
+results_n10 <- calculate_clt_params(results_n10, true_mean, true_var)
+results_n50 <- calculate_clt_params(results_n50, true_mean, true_var)
+
+cat("n=5:  D =", round(results_n5$D, 4), "\n")
+cat("n=10: D =", round(results_n10$D, 4), "\n")
+cat("n=50: D =", round(results_n50$D, 4), "\n\n")
+
 ```
 
 #### We can now plot ecdf and cdf
 
 ```{r}
-xlims <- c(mu-3*sigma,mu+3*sigma)
-Fs <- ecdf(sample_means)
-plot(Fs,
-     xlim = xlims,
-     col = "blue",
-     lwd = 2,
-     main = "Comparison of ecdf and cdf")
-curve(pnorm(x, mean = mu, sd = sigma), col = "red", lwd = 2, add = TRUE)
+plot_ecdf_vs_normal <- function(res) {
+  plot(res$xs, res$ecdf_vals, type = "s", ylim = c(0,1),
+       xlab = "Sample mean", ylab = "CDF",
+       main = paste("Empirical CDF vs Normal CLT (n=", res$n, ")", sep=""))
+  lines(res$xs, res$normal_cdf_vals, col = "red", lwd = 2)
+  legend("bottomright", legend = c("Empirical CDF", "Normal CLT"),
+         col = c("black", "red"), lwd = c(1,2))
+}
+
+hist_with_normal <- function(res) {
+  h <- hist(res$s, breaks = 30, plot = FALSE)
+  plot(h, freq = FALSE, main = paste("Histogram sample means (n=", res$n, ")", sep=""), xlab = "sample mean")
+  curve(dnorm(x, mean = res$mu_clt, sd = res$sigma_clt), add = TRUE, lwd = 2, col = "red")
+}
+
+par(mfrow = c(1,3))
+plot_ecdf_vs_normal(results_n5)
+plot_ecdf_vs_normal(results_n10)
+plot_ecdf_vs_normal(results_n50)
+par(mfrow = c(1,1))
+
+par(mfrow = c(1,3))
+hist_with_normal(results_n5)
+hist_with_normal(results_n10)
+hist_with_normal(results_n50)
+par(mfrow = c(1,1))
+```
+
+As n increases the distance D decreases -\> empirical CDF gets closer to normal CDF
+
+#### Solution of the second part
+
+-   Markov inequality
+
+    ```{r}
+    N_markov <- 100/(0.95*nu1)
+    cat("Markov bound => max N (integer) =", N_markov, " (using nu1 =", nu1, ")\n")
+    ```
+
+-   Chernoff inequality
+
+    ```{r}
+    f <- function(N) {
+      nu <- 42 * N
+      log_lhs <- 100 * (log(nu) - log(100)) + 100 - nu
+      return(exp(log_lhs) - 0.05)
+    }
+    solution <- uniroot(f, interval = c(1, 2))
+    N_chernoff <- solution$root
+    ```
+
+-   CLT approx
+
+    ```{r}
+    p_threshold <- 0.05
+    z_score <- qnorm(p_threshold)
+    nu_max <- 100 + sqrt(100) * z_score
+    N_max_continuous <- nu_max / nu1
+    N_clt <- N_max_continuous
+    ```
+
+```{r}
+cat("Lambda (mean counts in 60s) thresholds:\n",
+    "Markov:", N_markov, "\n",
+    "Chernoff:", N_chernoff, "\n",
+    "CLT:", N_clt, "\n\n")
+```
+
+**Simulation of X and S**
+
+```{r}
+simulate_probability_safe <- function(N, trials = 20000) {
+  nu <- N * nu1 
+  S_values <- rgamma(trials, shape = 100, rate = nu)
+  safe_events <- (S_values >= 1)
+  mean(safe_events)
+}
+
+candidates <- unique(c(floor(N_markov), floor(N_chernoff), 
+                       N_markov + 1, N_chernoff + 1, N_clt + 1, 2))
+candidates <- candidates[candidates >= 0]
+
+
+sim_results <- sapply(candidates, function(N) simulate_probability_safe(N, trials = 20000))
+results_table <- data.frame(
+  Candidate_N = candidates,
+  Probability = round(sim_results, 4),
+  row.names = NULL)
+print(results_table)
+
+simulate_S_times <- function(N, trials = 10000) {
+  nu <- nu1 * N
+  svals <- rgamma(trials, shape = 100, rate = nu)
+  mean(svals > 1)
+}
+
+N_test <- 2
+prob_safe_S <- simulate_S_times(N_test, trials = 20000)
+cat("Probability (S >= 1) for N =", 2, "estimated =", round(prob_safe_S,4),
+    " -> this is the prob that 100 clicks take longer than 60s (so <=99 clicks in 60s).\n")
+```
+
+-   Markov bound isn't rigorous
+
+-   Chernoff and CLT approxes are much tighter than Markov
+
+    From the table we see, that the maximum N for which P(S\>=1) \>= 0.95 is 2. According to Chernoff and CLT approximations max(N) = 1, but it's only approximation, so it's normal that in practice max(N) = 2.
+
+**Getting the sample s of total times until the 100th click**
+
+```{r}
+N_predicted <- 2
+nu_predicted <- N_predicted * nu1
+
+s <- rgamma(K, shape = 100, rate = nu_predicted)
+
+print(head(s))
+```
+
+**Probability estimation**
+
+```{r}
+safe_events <- (s >= 1)
+
+estimated_prob <- mean(safe_events)
+
+desired_level <- 0.95
+
+cat(sprintf("Estimated probability P(S >= 1): %.4f\n", estimated_prob))
+cat(sprintf("Desired probablity level: %.4f\n", desired_level))
 ```
 
 **Next, proceed with all the remaining steps**
