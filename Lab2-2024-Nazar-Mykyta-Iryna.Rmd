@@ -20,6 +20,17 @@ output:
 -   The **team id number** referred to in tasks is the **two-digit** ordinal number of your team on the list. Include the line **set.seed(team id number)** at the beginning of your code to make your calculations reproducible. Also observe that the answers **do** depend on this number!\
 -   Take into account that not complying with these instructions may result in point deduction regardless of whether or not your implementation is correct.
 
+
+## Work breakdown
+- Task 1
+  - Микита Ягода(33%)
+- Task 2 & 3
+  - Ірина Свириденко(33%)
+- Task 4
+  - Назар Михайлищук(33%)
+
+
+
 ------------------------------------------------------------------------
 
 ### Task 1
@@ -121,7 +132,7 @@ received <- xor(codewords, errors) * 1 # * 1 -- to convert TRUE and FALSE to 1 a
 
 The next steps include detecting the errors in the received messages, correcting them, and then decoding the obtained messages. After this, you can continue with calculating all the quantities of interest
 
-``` {r}
+```{r}
 z <- received %*% H %% 2
 
 # function to map syndrome (z1,z2,z3) to position 0..7
@@ -162,7 +173,7 @@ $Var(\Theta) = \frac{\sum_{i=1}^N Var(X_i)}{N^2} = \frac{p^*(1-p^*)}{N}$
 $MSE(\hat{p}) = BIAS(\hat{p})^2 + Var(\hat{p}) \xrightarrow{\hat{p}\ is\ unbiased} MSE(\hat{p}) = Var(\hat{p})$
 
 Due to CLT we can use k-sigma rule to predict the interval $(p^* - 2*sd, p^* + 2*sd)$ in which $\hat{p}$ falls with probability 0.95
-``` {r}
+```{r}
 sd <- sqrt(p_hat*(1 - p_hat) / n)
 sd
 mse <- sd^2
@@ -175,7 +186,7 @@ $\varepsilon = z_{0.975} * \hat{\sigma} = z_{0.975} * \sqrt{\frac{\hat{p}(1-\hat
 
 $N = \frac{\hat{p}(1-\hat{p}) z_{0.975}^2}{\varepsilon^2}$
 
-``` {r}
+```{r}
 epsilon <- 0.03
 N_approx <- p_hat * (1-p_hat) * 1.96^2 / epsilon^2
 N_approx
@@ -227,9 +238,17 @@ Assume that a medical laboratory receives $n$ samples of radioactive element ${{
     -   repeat this $K$ times to get the sample $\mathbf{s}=(s_1,\dots,s_K)$ of sums;
     -   calculate the number of elements of the sample which are less than critical value ($8 \times 10^8$) and calculate the empirical probability; comment whether it is close to the desired level $0.95$
 
+#### Part 1
+
 ```{r}
 lambda <- log(2)/(30.1*365*24*3600)
-m <- 32e-6
+lambda
+```
+
+#### Part 2
+```{r}
+
+m <- id * 1e-6
 M <- 136.9
 Na <- 6e23
 N <- m*Na/M
@@ -262,13 +281,13 @@ summary_table <- data.frame(
 for (n in n_cases) {
   s <- numeric(K)
   for (i in seq_len(K)) s[i] <- sim_sample_mean(n, mu)
-  
+
   results[[as.character(n)]] <- list(
     n = n,
     s = s,
     ecdf_fun = ecdf(s)
   )
-  
+
   summary_table <- rbind(
     summary_table,
     data.frame(
@@ -282,7 +301,7 @@ for (n in n_cases) {
 print(summary_table, row.names = FALSE)
 ```
 
-#### We can now plot ecdf and cdf
+##### We can now plot ecdf and cdf
 
 -   identify $\mu$ and $\sigma^2$ such that the \textbf{c.d.f.} $F$ of $\mathscr{N}(\mu,\sigma^2)$ is close to the \textbf{e.c.d.f.} $\hat F_{\mathbf{s}}$ and plot both **c.d.f.**'s on one graph to visualize their proximity (use the proper scales!);
 
@@ -297,7 +316,8 @@ for (n in n_cases) {
   normal_cdf_vals <- pnorm(s_sorted, mean = mu_clt, sd = sd_clt)
   # plot ECDF (step) and theoretical normal CDF (red)
   plot(s_sorted, ecdf_vals, type = "s", ylim = c(0,1),
-       main = paste("n =", n), xlab = "sample mean", ylab = "CDF")
+       main = paste("n =", n), xlab = "sample mean", ylab = "CDF",
+       lwd=5)
   lines(s_sorted, normal_cdf_vals, col = "red", lwd = 2)
   legend("bottomright", legend = c("Empirical ECDF", "Normal CLT"), col = c("black","red"), lwd = c(1,2))
 }
@@ -334,13 +354,13 @@ for (n in n_cases) {
     ```{r}
 
     f_chernoff_log <- function(n, mu_param, k_param, log_p) {
-      lambda_n <- n * mu_param 
+      lambda_n <- n * mu_param
       log_lhs <- (k_param - lambda_n) + k_param * (log(lambda_n) - log(k_param))
       return(log_lhs - log_p)
     }
 
     max_n_domain <- critical_value / mu
-    upper_bound <- max_n_domain - 1e-6 
+    upper_bound <- max_n_domain - 1e-6
     solution <- uniroot(
       f_chernoff_log,
       interval = c(1, upper_bound),
@@ -423,11 +443,7 @@ It is so, because every our sample contains values which are far away from $8 \t
 #### First, generate samples an sample means:
 
 ```{r}
-team_id <- 32
-nu1 <- team_id + 10
-
-library(ggplot2)
-library(stats)
+nu1 <- id + 10
 
 K <- 5000
 true_mean <- 1 / nu1
@@ -551,13 +567,13 @@ cat("Lambda (mean counts in 60s) thresholds:\n",
 
 ```{r}
 simulate_probability_safe <- function(N, trials = 20000) {
-  nu <- N * nu1 
+  nu <- N * nu1
   S_values <- rgamma(trials, shape = 100, rate = nu)
   safe_events <- (S_values >= 1)
   mean(safe_events)
 }
 
-candidates <- unique(c(floor(N_markov), floor(N_chernoff), 
+candidates <- unique(c(floor(N_markov), floor(N_chernoff),
                        N_markov + 1, N_chernoff + 1, N_clt + 1, 2))
 candidates <- candidates[candidates >= 0]
 
@@ -703,10 +719,10 @@ cat(sprintf("Desired probablity level: %.4f\n", desired_level))
         cat("Simulation (s2_y):", s2_y, "\n")
         ```
 
-**Do not forget to include several sentences summarizing your work and the conclusions you have made!**
-
 ------------------------------------------------------------------------
 
 ### General summary and conclusions
 
-Summarize here what you've done, whether you solved the tasks, what difficulties you had etc.
+Across all parts of the assignment, the work focused on applying our knowledge of distributions(Normal, Poisson, Uniform...) and analytical methods(ecdf, pmf expectations, variances, and confidence intervals).
+Also tasks involved Markov and Chernoff bounds and confidence intervals. The last one we are currently covering on Lecture 9, which is after the lab.
+The final section on transformations of random variables involved both direct computation of densities and empirical confirmation through generated samples.
