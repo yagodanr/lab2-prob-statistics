@@ -228,35 +228,173 @@ Assume that a medical laboratory receives $n$ samples of radioactive element ${{
     -   calculate the number of elements of the sample which are less than critical value ($8 \times 10^8$) and calculate the empirical probability; comment whether it is close to the desired level $0.95$
 
 ```{r}
-lambda <- 1  # change this!
-N <- 100     # change this!
+lambda <- log(2)/(30.1*365*24*3600)
+m <- 32e-6
+M <- 136.9
+Na <- 6e23
+N <- m*Na/M
 mu <- N * lambda
-K <- 1e3
+K <- 20e3
 n <- 5
-sample_means <- colMeans(matrix(rpois(n*K, lambda = mu), nrow=n))
+n_cases <- c(5, 10, 50)
+sim_sample_mean <- function(n, mu) {
+  x <- rpois(n, lambda = mu)
+  mean(x)
+}
+for (n in n_cases) {
+  xvec <- rpois(n, lambda = mu)
+  s_mean <- mean(xvec)
+  cat("n =", n, ": sample x =", paste(round(xvec, 0), collapse = ", "), "; sample mean =", round(s_mean, 6), "\n")
+}
 ```
 
-#### Next, calculate the parameters of the standard normal approximation
+-   repeat this $K$ times to get the sample $\mathbf{s}=(s_1,\dots,s_K)$ of means and form the empirical cumulative distribution function $\hat F_{\mathbf{s}}$ of $\mathbf{s}$;
 
 ```{r}
-mu <- 0       # change this!
-sigma <- 1    # change this!
+results <- list()
+summary_table <- data.frame(
+  n = numeric(),
+  mean_of_means = numeric(),
+  var_of_means = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (n in n_cases) {
+  s <- numeric(K)
+  for (i in seq_len(K)) s[i] <- sim_sample_mean(n, mu)
+  
+  results[[as.character(n)]] <- list(
+    n = n,
+    s = s,
+    ecdf_fun = ecdf(s)
+  )
+  
+  summary_table <- rbind(
+    summary_table,
+    data.frame(
+      n = n,
+      mean_of_means = mean(s),
+      var_of_means = var(s)
+    )
+  )
+}
+
+print(summary_table, row.names = FALSE)
 ```
 
 #### We can now plot ecdf and cdf
 
+-   identify $\mu$ and $\sigma^2$ such that the \textbf{c.d.f.} $F$ of $\mathscr{N}(\mu,\sigma^2)$ is close to the \textbf{e.c.d.f.} $\hat F_{\mathbf{s}}$ and plot both **c.d.f.**'s on one graph to visualize their proximity (use the proper scales!);
+
 ```{r}
-xlims <- c(mu-3*sigma,mu+3*sigma)
-Fs <- ecdf(sample_means)
-plot(Fs,
-     xlim = xlims,
-     ylim = c(0,1),
-     col = "blue",
-     lwd = 2,
-     main = "Comparison of ecdf and cdf")
-curve(pnorm(x, mean = mu, sd = sigma), col = "red", lwd = 2, add = TRUE)
+par(mfrow = c(1,3))
+for (n in n_cases) {
+  s <- results[[as.character(n)]]$s
+  s_sorted <- sort(s)
+  ecdf_vals <- results[[as.character(n)]]$ecdf_fun(s_sorted)
+  mu_clt <- mu
+  sd_clt <- sqrt(mu / n)
+  normal_cdf_vals <- pnorm(s_sorted, mean = mu_clt, sd = sd_clt)
+  # plot ECDF (step) and theoretical normal CDF (red)
+  plot(s_sorted, ecdf_vals, type = "s", ylim = c(0,1),
+       main = paste("n =", n), xlab = "sample mean", ylab = "CDF")
+  lines(s_sorted, normal_cdf_vals, col = "red", lwd = 2)
+  legend("bottomright", legend = c("Empirical ECDF", "Normal CLT"), col = c("black","red"), lwd = c(1,2))
+}
+par(mfrow = c(1,1))
 ```
 
+-   calculate the maximal difference between the two \textbf{c.d.f.}'s;
+
+```{r}
+max_distance <- data.frame(n = integer(), D = numeric(), stringsAsFactors = FALSE)
+for (n in n_cases) {
+  s <- results[[as.character(n)]]$s
+  s_sorted <- sort(s)
+  ecdf_vals <- results[[as.character(n)]]$ecdf_fun(s_sorted)
+  normal_cdf_vals <- pnorm(s_sorted, mean = mu, sd = sqrt(mu / n))
+  D <- max(abs(ecdf_vals - normal_cdf_vals))
+  max_distance <- rbind(max_distance, data.frame(n = n, D = D))
+  cat("n =", n, ": max D =", round(D, 6), "\n")
+}
+```
+
+#### Part 3
+
+-   Markov inequality
+
+    ```{r}
+    p_target <- 0.95
+    critical_value <- 8e8
+    n_markov <- (1-p_target) * critical_value / mu
+    ```
+
+-   Chernoff inequality
+
+    ```{r}
+
+    f_chernoff_log <- function(n, mu_param, k_param, log_p) {
+      lambda_n <- n * mu_param 
+      log_lhs <- (k_param - lambda_n) + k_param * (log(lambda_n) - log(k_param))
+      return(log_lhs - log_p)
+    }
+
+    max_n_domain <- critical_value / mu
+    upper_bound <- max_n_domain - 1e-6 
+    solution <- uniroot(
+      f_chernoff_log,
+      interval = c(1, upper_bound),
+      mu_param = mu,
+      k_param = critical_value,
+      log_p = log(1 - p_target)
+    )
+    n_chernoff <- solution$root
+    ```
+
+-   CLT approx
+
+    ```{r}
+    f_clt <- function(n) {
+      pnorm((critical_value - n * mu) / sqrt(n * mu)) - p_target
+    }
+    n_clt <- uniroot(f_clt, c(1, 1000))$root
+    ```
+
+```{r}
+set.seed(123)
+n_cases <- c(n_markov, n_chernoff, n_clt, 8)
+results <- data.frame(
+  Method = c("Markov", "Chernoff", "CLT", "8"),
+  n_theoretical = n_cases,
+  empirical_p = NA
+)
+
+for (i in seq_along(n_cases)) {
+  n <- n_cases[i]
+  s <- replicate(K, sum(rpois(n, lambda = mu)))
+  p_emp <- mean(s < critical_value)
+  results$empirical_p[i] <- p_emp
+}
+
+# === Part 4: Output ===
+
+print(results, row.names = FALSE)
+```
+
+```{r}
+s_vec <- numeric(K)
+
+for (i in seq_len(K)) {
+  x <- rpois(n, lambda = mu)
+  s_vec[i] <- sum(x)
+}
+
+p_empirical <- mean(s_vec < critical_value)
+
+cat("Empirical probability P(S < 8e8) =", round(p_empirical, 4), "\n")
+```
+
+It is so, because every our sample contains values which are far away from $8 \times 10^8$, as N = 7, the $\lambda_n = n \cdot \mu = 7 \cdot (1.02 \times 10^8) = \mathbf{7.14 \times 10^8}$, which is far from the critical value.
 **Next, proceed with all the remaining steps**
 
 **Do not forget to include several sentences summarizing your work and the conclusions you have made!**
