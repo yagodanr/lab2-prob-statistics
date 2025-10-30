@@ -381,7 +381,6 @@ for (n in n_cases) {
     ```
 
 ```{r}
-set.seed(123)
 n_cases <- c(n_markov, n_chernoff, n_clt, 8)
 results <- data.frame(
   Method = c("Markov", "Chernoff", "CLT", "8"),
@@ -457,8 +456,6 @@ simulate_clt <- function(n, K = 5000, dist = rexp, dist_params = list(rate = nu1
   }
   list(n = n, s = s)
 }
-
-set.seed(123)
 results_n5  <- simulate_clt(5,  K = K)
 results_n10 <- simulate_clt(10, K = K)
 results_n50 <- simulate_clt(50, K = K)
